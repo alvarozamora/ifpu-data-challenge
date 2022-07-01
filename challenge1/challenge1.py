@@ -134,7 +134,7 @@ def save_results():
             results_to_save[key] = value
 
     # Save dictionary to disk with SUBSAMPLE as key
-    np.savez("challenge1.npz", **results_to_save)
+    np.savez(f"challenge1_{SUBSAMPLE}.npz", **results_to_save)
 
 
 plot_pCDF()

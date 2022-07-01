@@ -37,12 +37,12 @@ for run in runs:
     pos_array = np.split(np.random.permutation(pos)[:8 * SUBSAMPLE * NUM_SUBSAMPLES], NUM_SUBSAMPLES)
 
     # Accumulator for the subsample measurements
-    accumulator = np.array()
+    accumulator = np.zeros((NUM_SUBSAMPLES, NRAND, len(k)))
 
     # Iterator
     iterator = tqdm(pos_array)
     iterator.set_description(run.replace(".npz",""))
-    for pos in iterator:
+    for (i, pos) in enumerate(iterator):
 
         # Generate tree for this run
         tree = Tree(pos, leafsize=32, boxsize=BOXSIZE)
@@ -52,13 +52,16 @@ for run in runs:
         r, ids = tree.query(queries, k=k, workers=32)
 
         # Append subsample result to run results
-        np.append(accumulator, r, axis=0)
+        accumulator[i] = r
     
     # Sanity check
-    assert accumulator.shape == (NUM_SUBSAMPLES * NRAND, len(k)), "invalid size"
+    assert accumulator.shape == (NUM_SUBSAMPLES,  NRAND, len(k)), f"invalid size {accumulator.shape} != {(NUM_SUBSAMPLES,  NRAND, len(k))}"
 
     # Get CDF at percentiles
-    result = np.percentile(r, PERCENTILES * 100, axis=0)
+    result = np.percentile(accumulator.reshape(NUM_SUBSAMPLES * NRAND, len(k)), PERCENTILES * 100, axis=0)
+
+    # Sanity check
+    assert result.shape == (len(PERCENTILES), len(k)), f"invalid size {result.shape} != {(len(PERCENTILES), len(k))}"
 
     # Append mean of all subsamples to results
     results.append(result)

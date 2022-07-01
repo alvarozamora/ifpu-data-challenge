@@ -9,9 +9,9 @@ from tqdm import tqdm
 BOXSIZE = 2000
 
 # kNN Parameters
-NRAND = 10**5
+NRAND = 10**6
 YMIN = 1e-3
-PERCENTILES = np.sort(np.append(np.logspace(np.log10(YMIN), np.log10(0.5), 100), 1-np.logspace(np.log10(YMIN), np.log10(0.5), 100)[:-1]))
+PERCENTILES = np.sort(np.append(np.logspace(np.log10(YMIN), np.log10(0.5), 200), 1-np.logspace(np.log10(YMIN), np.log10(0.5), 200)[:-1]))
 print(PERCENTILES)
 PCDF = np.minimum(PERCENTILES, 1-PERCENTILES)
 k = [1,2,3,4]; kstr = [str(kk) for kk in k]

@@ -155,14 +155,17 @@ def get_pCDF(cdf):
 if __name__ == "__main__":
 
     subsamples = [250, 500, 1000]
-    subsamples = [500, 1000]
+    subsamples = [250, 500]
     YMIN = 1e-3
     PERCENTILES = np.sort(np.append(np.logspace(np.log10(YMIN), np.log10(0.5), 200), 1-np.logspace(np.log10(YMIN), np.log10(0.5), 200)[:-1]))
     PCDF = np.minimum(PERCENTILES, 1-PERCENTILES)
 
-    plt.figure(1, figsize=(12,8))
-    plt.figure(2, figsize=(12,16))
+    cmap=plt.get_cmap('tab20')
+
     for sub in subsamples:
+
+        fig1, ax1 = plt.subplots(figsize=(12,8))
+        fig2, [ax2_1, ax2_2] = plt.subplots(2, 1, figsize=(12,16))
 
         data_sub = np.load(f"challenge1_{sub}.npz")
     
@@ -188,39 +191,39 @@ if __name__ == "__main__":
             pred_pcdf3 = np.minimum(pred_cdf3, 1-pred_cdf3)
             pred_pcdf4 = np.minimum(pred_cdf4, 1-pred_cdf4)
 
-            plt.figure(1)
-            plt.loglog(cdf1, PCDF, label="1NN")
-            plt.loglog(cdf2, PCDF, label="2NN")
-            plt.loglog(cdf3, PCDF, label="3NN")
-            plt.loglog(cdf4, PCDF, label="4NN")
-            plt.loglog(dist, pred_pcdf3, "--", label="pred 3NN")
-            plt.loglog(dist, pred_pcdf4, "--", label="pred 4NN")
+            ax1.loglog(cdf1, PCDF, label="1NN")
+            ax1.loglog(cdf2, PCDF, label="2NN")
+            ax1.loglog(cdf3, PCDF, label="3NN")
+            ax1.loglog(cdf4, PCDF, label="4NN")
+            ax1.loglog(dist, pred_pcdf3, "--", label="pred 3NN")
+            ax1.loglog(dist, pred_pcdf4, "--", label="pred 4NN")
 
-            plt.ylim(1e-3)
-            plt.xlabel("Distance (Mpc/h)")
-            plt.ylabel("Peaked CDF")
-            plt.title(rf"Peaked kNNs for $n = {sub}$")
-            plt.grid(alpha=0.6)
-            plt.legend()
-            plt.savefig(f"knns_{sub}_run{run}", dpi=230)
-            plt.clf()
+            ax1.set_ylim(1e-3)
+            ax1.set_xlabel("Distance (Mpc/h)")
+            ax1.set_ylabel("Peaked CDF")
+            ax1.set_title(rf"Peaked kNNs for $n = {sub}$")
+            ax1.grid(alpha=0.6)
+            ax1.legend()
+            fig1.savefig(f"knns_{sub}_run{run}", dpi=230)
+            ax1.cla()
 
-            plt.figure(2)
-            plt.subplot(211)
-            plt.semilogx(cdf3, np.interp(cdf3, dist, pred_cdf3, right=np.nan)/PERCENTILES, label=str(run))
-            plt.xlabel("Distance (Mpc/h)")
-            plt.ylabel(r"\text{3NN predicted/measured}")
-            plt.grid(alpha=0.6)
-            plt.legend()
-            plt.subplot(212)
-            plt.semilogx(cdf4, np.interp(cdf4, dist, pred_cdf4, right=np.nan)/PERCENTILES, label=str(run))
-            plt.xlabel("Distance (Mpc/h)")
-            plt.ylabel(r"\text{4NN predicted/measured}")
-            plt.grid(alpha=0.6)
-            plt.legend()
-        plt.suptitle(rf"Predicted/Measured for $n = {sub}$")
-        plt.savefig(f"pred_measured_{sub}.png", dpi=230)
-        plt.clf()
+
+            ax2_1.loglog(cdf3, np.abs(1-np.interp(cdf3, dist, pred_cdf3, right=np.nan)/PERCENTILES), label=str(run), color=cmap(run))
+            ax2_1.set_xlabel("Distance (Mpc/h)")
+            ax2_1.set_ylabel(r"$|1-\mathrm{3NN predicted/measured}|$")
+            ax2_1.grid(alpha=0.6)
+
+            ax2_2.loglog(cdf4, np.abs(1-np.interp(cdf4, dist, pred_cdf4, right=np.nan)/PERCENTILES), label=str(run), color=cmap(run))
+            ax2_2.set_xlabel("Distance (Mpc/h)")
+            ax2_2.set_ylabel(r"$|1-\mathrm{4NN predicted/measured}|$")
+            ax2_2.grid(alpha=0.6)
+            
+
+        ax2_1.legend()
+        ax2_2.legend()
+        fig2.suptitle(rf"Predicted/Measured for $n = {sub}$")
+        fig2.savefig(f"pred_measured_{sub}.png", dpi=230)
+        fig2.clf()
 
             
 

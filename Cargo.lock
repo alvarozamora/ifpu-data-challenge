@@ -231,6 +231,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
+name = "ifpu-knns"
+version = "0.1.0"
+dependencies = [
+ "dashmap",
+ "env_logger",
+ "interp1d",
+ "itertools",
+ "log",
+ "nabo",
+ "ndarray",
+ "ndarray-npy",
+ "rand",
+ "rayon",
+]
+
+[[package]]
 name = "interp1d"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -604,22 +620,6 @@ name = "regex-syntax"
 version = "0.6.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3f87b73ce11b1619a3c6332f45341e0047173771e8b8b73f87bfeefb7b56244"
-
-[[package]]
-name = "rust"
-version = "0.1.0"
-dependencies = [
- "dashmap",
- "env_logger",
- "interp1d",
- "itertools",
- "log",
- "nabo",
- "ndarray",
- "ndarray-npy",
- "rand",
- "rayon",
-]
 
 [[package]]
 name = "scopeguard"

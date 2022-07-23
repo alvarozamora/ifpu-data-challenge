@@ -51,7 +51,7 @@ pub(crate) fn construct_cdf_interpolator<const K: usize>(neighbors: Vec<Neighbou
         let cdf = (1..=size)
             .map(|i| i as f64 / size as f64)
             .collect_vec();
-        (k as u16, Interp1d::new_sorted(cdf, std::mem::take(&mut dists[k])).unwrap())
+        (k as u16 + 1, Interp1d::new_sorted(cdf, std::mem::take(&mut dists[k])).unwrap())
     })
     .collect()
 

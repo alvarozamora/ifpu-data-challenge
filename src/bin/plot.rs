@@ -1,9 +1,9 @@
 use dashmap::DashMap;
 use ndarray_npy::NpzReader;
 use ndarray::Array1;
-use plotters::style::full_palette::{BLUE_100, ORANGE, GREEN_100, ORANGE_100};
+use plotters::style::full_palette::{ORANGE, GREEN_100, ORANGE_100};
 // use std::ops::AddAssign;
-use std::ops::DivAssign;
+use std::ops::{DivAssign, AddAssign};
 
 use std::{fs::File, error::Error};
 use plotters::prelude::*;
@@ -50,9 +50,11 @@ impl KnnResult {
         // Initialize return value
         let cdfs = DashMap::new();
 
-        for run in 1..15_u8 {
-            for k in 1..K as u16 {
-                cdfs.insert((run, k), npz.by_name("run{run}_{k}").expect("cdf should exist"));
+        for run in 1..=15 {
+            for k in 1..=K as u16 {
+                cdfs.insert((run, k), npz
+                        .by_name(format!("run{run}_{k}").as_str())
+                        .expect(format!("run{run}_{k} should exist").as_str()));
             }
         }
 
@@ -77,7 +79,7 @@ impl KnnResult {
         for k in 1..=K as u16 {
 
             // Path to save to
-            let first_plot_file = format!("{PLOTS_DIR}/{}/{FIRST_PLOT_PREFIX}_{k}", self.dataset);
+            let first_plot_file = format!("{PLOTS_DIR}/{}/{FIRST_PLOT_PREFIX}_{k}.png", self.dataset);
 
             // Backend
             let root = BitMapBackend::new(&first_plot_file, (1024, 768)).into_drawing_area();
@@ -128,7 +130,7 @@ impl KnnResult {
         // plot 2 (one per run, all k shown)
         for run in 1..=15 {
 
-            let second_plot_file = format!("{PLOTS_DIR}{}{SECOND_PLOT_PREFIX}", self.dataset);
+            let second_plot_file = format!("{PLOTS_DIR}/{}{SECOND_PLOT_PREFIX}_{run}.png", self.dataset);
 
             // Backend
             let root = BitMapBackend::new(&second_plot_file, (1024, 768)).into_drawing_area();
@@ -233,11 +235,15 @@ impl KnnResult {
             for run in 1..=15 {
 
                 // Retrieve measured cdf
-                let measured_knn = self.cdfs.get(&(run, 1)).expect("cdf should exist");
+                let measured_knn = self.cdfs.get(&(run, k)).expect("cdf should exist");
                 
                 // means.get_mut(&k).unwrap().add_assign(&*measured_knn);
-                *means.get_mut(&k).unwrap() += &*measured_knn;
+                means.entry(k)
+                    .and_modify(|cdf| cdf.add_assign(&measured_knn.clone()))
+                    .or_insert(measured_knn.clone());
             }
+
+            // Divide by total to get mean
             means.get_mut(&k).unwrap().div_assign(15.0);
         }
 
@@ -246,7 +252,7 @@ impl KnnResult {
 }
 
 
-
+#[allow(unused)]
 fn cdf_2nn_from_1nn(
     cdf_1nn: &InterpolatedCDF
 ) -> InterpolatedCDF {

@@ -1,10 +1,15 @@
 
 
-use std::error::Error;
+use std::fmt::Display;
+use std::{error::Error, path::PathBuf};
+use download_rs::sync_download::Download;
 use nabo::dummy_point::P3;
 use ndarray_npy::NpzReader;
 use ndarray::{OwnedRepr, Ix2, Axis, Ix1};
 use dashmap::DashMap;
+use std::path::Path;
+use std::fs::File;
+use log::*;
 
 pub type Run = u8;
 pub type GType = bool;
@@ -23,11 +28,21 @@ pub struct Galaxies {
 /// data and returns a map from the run to the positions or velocities
 /// of the galaxies for that run.
 pub fn load(dataset: Dataset) -> Result<Galaxies, Box<dyn Error>> {
+
+    info!("Loading dataset");
     
     // Initialize inner maps
     let position = DashMap::new();
     let velocity = DashMap::new();
     let gtypes = DashMap::new();
+
+    match dataset.exists()? {
+        true => { /* do nothing */ }
+        false => { 
+            info!("Dataset not found, retrieving");
+            dataset.download_and_unzip()?
+        }
+    }
 
     for run in 1..=15 {
 
@@ -81,6 +96,14 @@ pub enum Dataset {
 }
 
 
+impl Display for Dataset {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Dataset::Challenge0Z0 => write!(f, "Challenge0_z0")
+        }
+    }
+}
+
 impl Dataset {
 
     /// Returns the corresponding directory for the dataset
@@ -89,10 +112,80 @@ impl Dataset {
             Dataset::Challenge0Z0 => "Challenge0_z0"
         }
     }
+
+    /// Returns the corresponding zipfile for the dataset
+    fn zip_path(&self) -> &'static str {
+        match self {
+            Dataset::Challenge0Z0 => "Challenge0_z0.zip"
+        }
+    }
+
+    /// Returns zip url
+    pub fn download_path(&self) -> &'static str {
+        match self {
+            Dataset::Challenge0Z0 => "https://shdw-drive.genesysgo.net/Czgtqxfv7rD9d7GA3orGtn9nxJZcp7bUX9eYUyCRYdSg/Challenge0_z0.zip"
+        }
+    }
+
     /// Returns appropriate npz name for the dataset
     pub fn out(&self) -> &'static str {
         match self {
             Dataset::Challenge0Z0 => "challenge0_z0.npz"
         }
     }
+
+    fn download_and_unzip(&self) -> Result<(), Box<dyn Error>> {
+        self.download_zip()?;
+        info!("Download finished. Unzipping");
+        self.unzip()
+    }
+
+    fn download_zip(&self) -> Result<(), Box<dyn Error>> {
+        Ok(Download::new(
+            self.download_path(),
+            Some(self.zip_path()),
+            None,
+        ).download()?)
+    }
+    
+    fn unzip(&self) -> Result<(), Box<dyn Error>> {
+
+        let zip_file = File::open(self.zip_path())?;
+
+        let target_dir = PathBuf::from(self.path());
+        info!("Unzipping into {target_dir:?}");
+        zip_extract::extract(
+            zip_file,
+            &target_dir,
+            true,
+        )?;
+        
+        Ok(())
+    }
+
+    /// Checks if the data for a given dataset exists
+    pub fn exists(&self) -> Result<bool, Box<dyn Error>> {
+
+        // Check directory
+        if !Path::new(self.path()).exists() {
+            if !Path::new(self.zip_path()).exists() {
+                return Ok(false)
+            } else {
+                info!("Dataset zip exists but is not unzipped. Unzipping");
+                self.unzip()?;
+                return Ok(true)
+            }
+        }
+
+        // Check all runs
+        for run in 1..=15 {
+            if !Path::new(&format!("{}/run{run}.npz", self.path())).exists() {
+                return Ok(false)
+            }
+        }
+
+        Ok(true)
+    }
 }
+
+

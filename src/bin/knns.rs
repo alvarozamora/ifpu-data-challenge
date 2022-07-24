@@ -1,25 +1,29 @@
 
 use std::error::Error;
 use log::info;
+use env_logger::Builder;
+use log::LevelFilter;
 
-mod load_data;
-mod knns;
-mod output;
-mod cdf;
 
-use load_data::*;
-use knns::calculate_knns;
+use ifpu_knns::load_data::*;
+use ifpu_knns::knns::calculate_knns;
+use ifpu_knns::output::output_to_disk;
 use nabo::dummy_point::P3;
-use output::output_to_disk;
 
-use crate::{
+use ifpu_knns::{
     knns::NearestNeighbors,
     output::InterpConfig
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
 
-    env_logger::init();
+    // Logging
+    let mut builder = Builder::new();
+    builder
+        .filter_level(LevelFilter::Info)
+        .write_style(env_logger::WriteStyle::Auto)
+        .format_timestamp_secs()
+        .init();
 
     /// Number of points per subsample
     const SUBSAMPLE: usize = 500;
@@ -41,7 +45,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let galaxies: Galaxies = load(Dataset::Challenge0Z0)?;
 
     // Calculate kNNs
-    info!("calculating kNNs");
+    info!("Calculating kNNs");
     let knns: NearestNeighbors<f64, P3> = calculate_knns::
         <SUBSAMPLE, QUERIES, LENGTH, LEAFSIZE, K>(&galaxies);
 

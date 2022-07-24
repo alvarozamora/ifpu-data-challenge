@@ -19,6 +19,7 @@ pub fn output_to_disk<const K: usize>(
     // Initialize NpzWriter
     let mut npz = NpzWriter::new(File::create(knns.dataset.out())?);
 
+    // Output data (i.e. cdf y values)
     for run in 1..=15 {
 
         // Construct CDF interpolator
@@ -43,12 +44,14 @@ pub fn output_to_disk<const K: usize>(
             // Convert to array and write to disk
             let interpolated_cdf = Array1::from_vec(interpolated_cdf);
             npz.add_array(format!("run{run}_{k}").as_str(), &interpolated_cdf)?;
-        }
-
-        
+        }        
     }
-    npz.finish()?;
 
+    // Now output percentiles used
+    npz.add_array("quantiles", &Array1::from_vec(interp_config.quantiles))?;
+
+
+    npz.finish()?;
     Ok(())
 }
 

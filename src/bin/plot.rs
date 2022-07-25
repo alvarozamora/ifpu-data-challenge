@@ -406,7 +406,7 @@ impl KnnResult {
                 let interp_grid: Distances = Distances::from_vec(
                     (0..INTERP_POINTS)
                         .map(|n| {
-                            rmin + n as f64 * (rmax - rmin) / (INTERP_POINTS - 0) as f64
+                            rmin + n as f64 * (rmax - rmin) / (INTERP_POINTS - 1) as f64
                         })
                         .collect_vec()
                 );

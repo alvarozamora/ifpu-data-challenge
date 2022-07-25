@@ -177,6 +177,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 
 [[package]]
+name = "colorous"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98804822ee752112e060b40110ae0188eff72b036baf49e61a9f2028eaf33164"
+
+[[package]]
 name = "const-cstr"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -726,6 +732,7 @@ dependencies = [
 name = "ifpu-knns"
 version = "0.1.0"
 dependencies = [
+ "colorous",
  "dashmap",
  "download_rs",
  "env_logger",

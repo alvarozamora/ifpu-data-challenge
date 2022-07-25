@@ -3,7 +3,7 @@
 use std::fmt::Display;
 use std::{error::Error, path::PathBuf};
 use download_rs::sync_download::Download;
-use nabo::dummy_point::P3;
+use nabo_pbc::dummy_point::P3;
 use ndarray_npy::NpzReader;
 use ndarray::{OwnedRepr, Ix2, Axis, Ix1};
 use dashmap::DashMap;

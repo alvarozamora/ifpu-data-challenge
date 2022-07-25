@@ -1,5 +1,5 @@
 use dashmap::DashMap;
-use nabo::{KDTree, Neighbour, Scalar, Point, dummy_point::P3, NotNan};
+use nabo_pbc::{KDTree, Neighbour, Scalar, Point, dummy_point::P3, NotNan};
 use rand::thread_rng;
 use rayon::prelude::*;
 

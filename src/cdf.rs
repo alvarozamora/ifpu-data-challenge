@@ -1,6 +1,6 @@
 use dashmap::DashMap;
 use interp1d::*;
-use nabo::dummy_point::P3;
+use nabo_pbc::dummy_point::P3;
 use rayon::prelude::*;
 use itertools::Itertools;
 

@@ -1,7 +1,7 @@
 use dashmap::DashMap;
 use interp1d::Interp1d;
 use itertools::Itertools;
-use nabo::dummy_point::P3;
+use nabo_pbc::dummy_point::P3;
 use ndarray_npy::NpzWriter;
 
 use ndarray::Array1;

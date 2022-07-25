@@ -739,7 +739,7 @@ dependencies = [
  "interp1d",
  "itertools",
  "log",
- "nabo",
+ "nabo-pbc",
  "ndarray",
  "ndarray-npy",
  "plotters",
@@ -987,8 +987,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "nabo"
+name = "nabo-pbc"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6be986d74e7ce6be4ed0ff3a745ac700a04316cb663a37ff8c9356b9da6d169"
 dependencies = [
  "num-traits",
  "ordered-float",

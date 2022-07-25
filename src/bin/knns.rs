@@ -8,7 +8,7 @@ use log::LevelFilter;
 use ifpu_knns::load_data::*;
 use ifpu_knns::knns::calculate_knns;
 use ifpu_knns::output::output_to_disk;
-use nabo::dummy_point::P3;
+use nabo_pbc::dummy_point::P3;
 
 use ifpu_knns::{
     knns::NearestNeighbors,

@@ -1,5 +1,6 @@
 use dashmap::DashMap;
 use nabo_pbc::{KDTree, Neighbour, Scalar, Point, dummy_point::P3, NotNan};
+use rand::prelude::SliceRandom;
 use rand::thread_rng;
 use rayon::prelude::*;
 
@@ -32,7 +33,7 @@ pub fn calculate_knns<
             .position
             .get(&run)
             .expect("entry for run should exist");
-        let pos: &Vec<P3> = entry.value();
+        let mut pos: Vec<P3> = entry.value().clone();
 
         // Calculate num galaxies, samples, queries per sample
         let num_galaxies = pos.len();
@@ -46,6 +47,7 @@ pub fn calculate_knns<
         let periodic: [NotNan<f64>; 3] = [NotNan::new(LENGTH as f64).unwrap(); 3];
 
         // Chunk positions and find knns
+        (&mut pos).shuffle(&mut thread_rng());
         let all_knns: Vec<Neighbours<f64, P3>> = pos
             .par_chunks_exact(SUBSAMPLE * (LENGTH / 1000).pow(3))
             .flat_map(|subsample| {

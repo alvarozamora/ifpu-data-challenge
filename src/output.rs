@@ -69,9 +69,9 @@ impl InterpConfig {
         let ymax_log10 = (0.5_f64).log10();
         
         // Construct left half
-        let left_points = points / 2;
+        let left_points = points / 2 + 1;
         let dlogy = (ymax_log10 - ymin_log10) / left_points as f64;
-        let mut left_half = (0..left_points)
+        let mut left_half = (0..=left_points)
             .map(|i| 10.0_f64.powf(ymin_log10 + i as f64 * dlogy))
             .collect_vec();
         

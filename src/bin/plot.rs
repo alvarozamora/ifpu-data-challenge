@@ -255,7 +255,7 @@ impl KnnResult {
                 .sorted_by(|a,b| b.partial_cmp(&a).unwrap())
                 .next()
                 .unwrap();
-            let interp_grid = (0..INTERP_POINTS)
+            let interp_grid = (1..INTERP_POINTS-1)
                 .map(|n| {
                     rmin + n as f64 * (rmax - rmin) / (INTERP_POINTS - 1).max(1) as f64
                 })

@@ -85,6 +85,7 @@ pub struct NearestNeighbors<T: Scalar, P: Point<T>> {
 
 fn gen_queries<const LENGTH: usize>(n: usize) -> Vec<P3> {
 
+    // Get reference to thread local rng
     let ref mut rng = thread_rng();
 
     (0..n)

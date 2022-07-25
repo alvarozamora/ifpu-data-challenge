@@ -36,7 +36,7 @@ pub fn calculate_knns<
 
         // Calculate num galaxies, samples, queries per sample
         let num_galaxies = pos.len();
-        let num_subsamples = num_galaxies / (SUBSAMPLE * LENGTH.pow(3));
+        let num_subsamples = num_galaxies / (SUBSAMPLE * (LENGTH / 1000).pow(3));
         let query_per_sample = QUERIES / num_subsamples;
 
         info!("Run {run} has {num_galaxies} --> {num_subsamples} subsamples");
@@ -47,7 +47,7 @@ pub fn calculate_knns<
 
         // Chunk positions and find knns
         let all_knns: Vec<Neighbours<f64, P3>> = pos
-            .par_chunks_exact(SUBSAMPLE * LENGTH.pow(3))
+            .par_chunks_exact(SUBSAMPLE * (LENGTH / 1000).pow(3))
             .flat_map(|subsample| {
 
                 // Generate queries for this subsample

@@ -28,9 +28,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     /// Number of points per subsample
     const SUBSAMPLE: usize = 500;
     /// Total number of queries
-    const QUERIES: usize = 10_000_000;
-    /// Box length, in Gpc/h
-    const LENGTH: usize = 2;
+    const QUERIES: usize = 100_000_000;
+    /// Box length, in Mpc/h
+    const LENGTH: usize = 2_000;
     /// Number of neighbors to find
     const K: usize = 4;
     /// Leafsize to use for KDTree

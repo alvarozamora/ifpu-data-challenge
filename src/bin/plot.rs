@@ -289,7 +289,7 @@ impl KnnResult {
                     self.quantiles.iter().cloned().map(|x| pcdf(x))
                         .zip((measured_1nn).into_iter())
                         .map(|(a, b)| (b, a)),
-                    get_color(1),
+                    get_color(1).stroke_width(3),
                 ))?
                 .label("Measured 1NN")
                 .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], get_color(1)));
@@ -298,7 +298,7 @@ impl KnnResult {
                     self.quantiles.iter().cloned().map(|x| pcdf(x))
                         .zip((measured_2nn).into_iter())
                         .map(|(a, b)| (b, a)),
-                    get_color(2),
+                    get_color(2).stroke_width(3),
                 ))?
                 .label("Measured 2NN")
                 .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], get_color(2)));
@@ -307,7 +307,7 @@ impl KnnResult {
                     self.quantiles.iter().cloned().map(|x| pcdf(x))
                         .zip((measured_3nn).into_iter())
                         .map(|(a, b)| (b, a)),
-                    get_color(3),
+                    get_color(3).stroke_width(3),
                 ))?
                 .label("Measured 3NN")
                 .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], get_color(3)));
@@ -316,7 +316,7 @@ impl KnnResult {
                     self.quantiles.iter().cloned().map(|x| pcdf(x))
                         .zip((measured_4nn).into_iter())
                         .map(|(a, b)| (b, a)),
-                    get_color(4),
+                    get_color(4).stroke_width(3),
                 ))?
                 .label("Measured 4NN")
                 .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], get_color(4)));
@@ -326,7 +326,7 @@ impl KnnResult {
                         .iter()
                         .cloned()
                         .zip((gaussian_3nn).into_iter().map(|x| pcdf(x))),
-                    get_color(5),
+                    get_color(5).stroke_width(3),
                 ))?
                 .label("GRF 3NN")
                 .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], get_color(5)));
@@ -336,7 +336,7 @@ impl KnnResult {
                         .iter()
                         .cloned()
                         .zip((gaussian_4nn).into_iter().map(|x| pcdf(x))),
-                    get_color(6),
+                    get_color(6).stroke_width(3),
                 ))?
                 .label("GRF 4NN")
                 .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], get_color(6)));

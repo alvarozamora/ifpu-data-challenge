@@ -9,6 +9,8 @@ use rayon::prelude::*;
 use rayon::iter::IntoParallelRefIterator;
 use std::{fs::File, error::Error};
 
+use log::info;
+
 use crate::{knns::NearestNeighbors, cdf::{construct_cdf_interpolator, KNN}};
 
 pub fn output_to_disk<const K: usize>(
@@ -28,6 +30,8 @@ pub fn output_to_disk<const K: usize>(
         );
 
         for k in 1..=K {
+
+            info!("Interpolating (run, k) = ({run}, {k})");
 
             // Get interpolator from map
             let interp = cdf_interpolator.get(&(k as u16)).unwrap();

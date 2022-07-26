@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Logging
     env_logger::builder()
-        .filter_level(LevelFilter::Info)
+        .filter_level(LevelFilter::Trace)
         .write_style(env_logger::WriteStyle::Auto)
         .format_timestamp_secs()
         .init();
@@ -119,8 +119,8 @@ impl KnnResult {
             trace!("retrieved mean with shapes ({}, {})", distances.len(), k_mean.len());
 
             // Initialize chart
-            let dmin = distances.iter().sorted_by(|a, b| b.partial_cmp(&a).unwrap()).next_back().unwrap()*0.95;
-            let dmax = distances.iter().sorted_by(|a, b| b.partial_cmp(&a).unwrap()).next().unwrap()*1.15;
+            let dmin = distances.iter().sorted_by(|a, b| a.partial_cmp(&b).unwrap()).next().unwrap()*0.95;
+            let dmax = distances.iter().sorted_by(|a, b| a.partial_cmp(&b).unwrap()).next_back().unwrap()*1.15;
             let mut chart = ChartBuilder::on(&root)
                 .x_label_area_size(35)
                 .y_label_area_size(50)
@@ -248,12 +248,12 @@ impl KnnResult {
             )?;
             let rmin = measured_4nn
                 .iter()
-                .sorted_by(|a,b| b.partial_cmp(&a).unwrap())
-                .next_back()
+                .sorted_by(|a,b| a.partial_cmp(&b).unwrap())
+                .next()
                 .unwrap();
             let rmax = measured_1nn.iter()
-                .sorted_by(|a,b| b.partial_cmp(&a).unwrap())
-                .next()
+                .sorted_by(|a,b| a.partial_cmp(&b).unwrap())
+                .next_back()
                 .unwrap();
             let interp_grid = (1..INTERP_POINTS-1)
                 .map(|n| {
@@ -365,16 +365,16 @@ impl KnnResult {
                 let one_nn = self.cdfs.get(&(i, 1)).unwrap();
                 let max = *one_nn
                     .iter()
-                    .sorted_by(|a, b| b.partial_cmp(&a).unwrap())
-                    .next()
+                    .sorted_by(|a, b| a.partial_cmp(&b).unwrap())
+                    .next_back()
                     .unwrap();
 
                 // Get largest 4NN min
                 let four_nn = self.cdfs.get(&(i, 4)).unwrap();
                 let min = *four_nn
                     .iter()
-                    .sorted_by(|a, b| b.partial_cmp(&a).unwrap())
-                    .next_back()
+                    .sorted_by(|a, b| a.partial_cmp(&b).unwrap())
+                    .next()
                     .unwrap();
                 trace!("run {i} has min/max {min:.2}/{max:2}");
 
@@ -421,7 +421,6 @@ impl KnnResult {
                     .flat_map(|x| {
                         let interp = interpolator_knn.interpolate_checked(*x);
                         if let Ok(value) = interp {
-                            trace!("interp: ({x}, {value})");
                             Some((*x, value))
                         } else {
                             None

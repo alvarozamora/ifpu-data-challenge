@@ -1,51 +1,31 @@
-use dashmap::DashMap;
 use interp1d::*;
-use nabo_pbc::dummy_point::P3;
 use rayon::prelude::*;
 use itertools::Itertools;
 
-use crate::knns::Neighbours;
 
 pub type KNN = u16;
 pub type Cdf = f64;
 pub type Distance = f64;
 
-pub(crate) fn construct_cdf_interpolator<const K: usize>(neighbors: Vec<Neighbours<f64, P3>>) -> DashMap<KNN, Interp1d<Cdf, Distance>> {
+pub(crate) fn construct_cdf_interpolator<const K: usize>(dists: Vec<[f64; K]>) -> std::collections::HashMap<KNN, Interp1d<Cdf, Distance>> {
 
 
-    let size = neighbors.len();
+    let size = dists.len();
     let cdf = (1..=size)
             .map(|i| i as f64 / size as f64)
             .collect_vec();
 
-    // Get distance and sort them
-    {
         
-        let mut iterator = {
-        
-            let dists: Vec<[f64; K]> = neighbors
-                .into_par_iter()
-                .map(|neighbors| {
-
-                    // Disard indices, neighbor positoins for this query point
-                    let mut knn_dists_iter = neighbors
-                        .iter()
-                        .map(|neighbor| neighbor.dist2.sqrt());
-
-                    [(); K].map(|_| knn_dists_iter.next().unwrap())
-                }).collect();
-
-            (0..K).map(move |k| {
-                dists
-                    .iter()
-                    .map(|x| x[k])
-                    .sorted_by(|a, b| a.partial_cmp(&b).expect("all distances should be finite"))
-                    .collect_vec()
-                })
-        };
-
-        (0..K as u16)
-            .map(|k| (k+1, Interp1d::new_sorted(cdf.clone(), std::mem::take(&mut iterator.next().unwrap())).unwrap()))
-            .collect()
-    }
+    (0..K)
+        .map(|k| {
+            (k, dists
+                .iter()
+                .map(|x| x[k])
+                .sorted_by(|a, b| a.partial_cmp(&b).expect("all distances should be finite"))
+                .collect_vec())
+        })
+        .par_bridge()
+        .into_par_iter()
+        .map(|(k, dists)| (k as u16 +1, Interp1d::new_sorted(cdf.clone(), dists).unwrap()))
+        .collect()
 }

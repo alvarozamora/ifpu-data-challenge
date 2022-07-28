@@ -1,9 +1,13 @@
-use dashmap::DashMap;
-use nabo_pbc::{KDTree, Neighbour, Scalar, Point, dummy_point::P3, NotNan};
+use std::collections::HashMap;
+
+use interp1d::Interp1d;
+use itertools::Itertools;
+use nabo_pbc::{KDTree, Neighbour, dummy_point::P3, NotNan};
 use rand::prelude::SliceRandom;
 use rand::thread_rng;
 use rayon::prelude::*;
 
+use crate::cdf::{construct_cdf_interpolator, KNN};
 use crate::load_data::Dataset;
 use crate::load_data::{Galaxies, Run};
 use log::info;
@@ -19,10 +23,10 @@ pub fn calculate_knns<
     const K: usize,
     >(
     galaxies: &Galaxies
-) -> NearestNeighbors<f64, P3> {
+) -> NearestNeighbors {
 
     // Initialize inner return value
-    let neighbors = DashMap::new();
+    let mut interpolators = HashMap::new();
 
     for run in 1..=15 {
 
@@ -48,7 +52,7 @@ pub fn calculate_knns<
 
         // Chunk positions and find knns
         (&mut pos).shuffle(&mut thread_rng());
-        let all_knns: Vec<Neighbours<f64, P3>> = pos
+        let nearest_neighbors: Vec<[f64; K]> = pos
             .par_chunks_exact(SUBSAMPLE * (LENGTH / 1000).pow(3))
             .flat_map(|subsample| {
 
@@ -56,29 +60,41 @@ pub fn calculate_knns<
                 let queries: Vec<P3> = gen_queries::<LENGTH>(query_per_sample);
                 let kdtree = KDTree::new_with_bucket_size(subsample, LEAFSIZE);
                 
-                queries
+                let neighbors: Vec<[f64; K]> = queries
                     .par_iter()
                     .map_with(&kdtree, |tree, query| {
-                        tree.knn_periodic(K as u32, query, &periodic)
-                    })
-                    .collect::<Vec<Neighbours<f64, P3>>>()
-            })
-            .collect::<Vec<Neighbours<f64, P3>>>();
+                        
+                        tree
+                            .knn_periodic(K as u32, query, &periodic)
+                            .into_iter()
+                            .map(|neighbor| {
+                                neighbor.dist2.sqrt()
+                            })
+                            .collect_vec()
+                            .try_into()
+                            .unwrap()
+
+                    }).collect();
+
+                    neighbors
+            }).collect();
+
+        let run_interpolators = construct_cdf_interpolator(nearest_neighbors);
 
         // Add neighbors to map
-        neighbors.insert(run, all_knns);
+        interpolators.insert(run, run_interpolators);
     }
 
     NearestNeighbors {
-        neighbors,
+        interpolators,
         dataset: galaxies.dataset,
     }
 }
 
 
 
-pub struct NearestNeighbors<T: Scalar, P: Point<T>> {
-    pub neighbors: DashMap<Run, Vec<Neighbours<T, P>>>,
+pub struct NearestNeighbors {
+    pub interpolators: HashMap<Run, HashMap<KNN, Interp1d<f64, f64>>>,
     pub(crate) dataset: Dataset,
 }
 

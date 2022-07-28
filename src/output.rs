@@ -1,20 +1,18 @@
-use dashmap::DashMap;
 use interp1d::Interp1d;
 use itertools::Itertools;
-use nabo_pbc::dummy_point::P3;
 use ndarray_npy::NpzWriter;
 
 use ndarray::Array1;
 use rayon::prelude::*;
 use rayon::iter::IntoParallelRefIterator;
-use std::{fs::File, error::Error};
+use std::{fs::File, error::Error, collections::HashMap};
 
 use log::info;
 
-use crate::{knns::NearestNeighbors, cdf::{construct_cdf_interpolator, KNN}};
+use crate::{knns::NearestNeighbors, cdf::KNN};
 
 pub fn output_to_disk<const K: usize>(
-    knns: NearestNeighbors<f64, P3>,
+    knns: NearestNeighbors,
     interp_config: InterpConfig,
 ) -> Result<(), Box<dyn Error>> {
 
@@ -25,9 +23,7 @@ pub fn output_to_disk<const K: usize>(
     for run in 1..=15 {
 
         // Construct CDF interpolator
-        let cdf_interpolator: DashMap<KNN, Interp1d<f64, f64>> = construct_cdf_interpolator::<K>(
-            std::mem::take(&mut*knns.neighbors.get_mut(&run).unwrap())
-        );
+        let cdf_interpolator: &HashMap<KNN, Interp1d<f64, f64>> = &*knns.interpolators.get(&run).expect("run data should exist");
 
         for k in 1..=K {
 

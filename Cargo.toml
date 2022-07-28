@@ -20,8 +20,3 @@ plotters = "0.3.2"
 rand = "0.8.5"
 rayon = "1.5.3"
 zip-extract = "0.1.1"
-
-
-[profile.release]
-lto = "fat"
-codegen-units = 1

@@ -1,4 +1,4 @@
-use colorous::{Color, SET1, SET2};
+use colorous::{Color, SET1, SET2, PAIRED};
 use dashmap::DashMap;
 use itertools::Itertools;
 use ndarray_npy::NpzReader;
@@ -16,14 +16,14 @@ use ifpu_knns::{
 };
 
 /// For this script, K must be greater than or equal to 4!
-const K: usize = 4;
+const K: usize = 8;
 
 /// Directory where plots are stored
 const PLOTS_DIR: &'static str = "./plots";
 /// Name of first plot
 const FIRST_PLOT_PREFIX: &'static str = "mean_diff";
 /// Name of second plot
-const SECOND_PLOT_PREFIX: &'static str = "all_four";
+const SECOND_PLOT_PREFIX: &'static str = "all";
 
 /// Number of points to use for interpolation
 const INTERP_POINTS: usize = 200;
@@ -340,6 +340,27 @@ impl KnnResult {
                 ))?
                 .label("GRF 4NN")
                 .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], get_color(6)));
+
+            if K > 4 {
+                for k in 5..=K {
+
+                    let measured_knn = self.cdfs.get(&(run, k as u16))
+                        .expect("cdf should exist")
+                        .clone();
+                    chart
+                        .draw_series(LineSeries::new(
+                            self.quantiles
+                                .iter()
+                                .cloned()
+                                .map(|x| pcdf(x))
+                                .zip((measured_knn).into_iter())
+                                .map(|(y, x)| (x, y)),
+                            get_color(k as u8 + 2).stroke_width(3),
+                        ))?
+                        .label(format!("Measured {k}NN"))
+                        .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], get_color(k as u8 + 2)));
+                }
+            }
             
             chart
                 .configure_series_labels()
@@ -350,8 +371,105 @@ impl KnnResult {
             root.present().expect(format!("Unable to write {second_plot_file} to file").as_str());
             println!("Plot saved to {}", second_plot_file);
         }
-        
-    
+
+        trace!("starting third plot");
+        let mut mins = vec![];
+        let mut maxs = vec![];
+        let xy_pairs: Vec<(InterpolatedCDF, InterpolatedCDF)> = (1..=15)
+            .map(|run| {
+
+            let measured_2nn = self.cdfs
+                .get(&(run, 2))
+                .expect("cdf should exist");
+            let measured_knn = self.cdfs
+                .get(&(run, K as u16))
+                .expect("cdf should exist");
+            let rmin = *measured_2nn
+                .iter()
+                .sorted_by(|a,b| a.partial_cmp(&b).unwrap())
+                .next()
+                .unwrap();
+            let rmax = *measured_knn
+                .iter()
+                .sorted_by(|a,b| a.partial_cmp(&b).unwrap())
+                .next()
+                .unwrap();
+            maxs.push(rmax);
+            mins.push(rmin);
+
+            let interp_grid: Distances = Distances::from_vec(
+                (0..INTERP_POINTS)
+                    .map(|n| {
+                        rmin + n as f64 * (rmax - rmin) / (INTERP_POINTS - 1) as f64
+                    })
+                    .collect_vec()
+            );
+
+            let interp_knns: Vec<InterpolatedCDF> = (1..=K)
+                .map(|k| {
+                    let measured_knn = self.cdfs
+                        .get(&(run, k as u16))
+                        .expect("cdf should exist")
+                        .clone();
+                    let interpolator = Interp1d::new_sorted(
+                        measured_knn.into_raw_vec(),
+                        self.quantiles.clone().into_raw_vec()
+                    ).expect("constructing interpolator shouldn't fail");
+
+                    InterpolatedCDF::from_vec(
+                        interp_grid
+                            .iter()
+                            .cloned()
+                            .map(|r| {
+                                interpolator.interpolate(r)
+                            }).collect::<Vec<_>>())
+                }).collect();
+
+            let third_cumulant = third_cumulant_approximated_from_first_k(interp_knns);
+            (interp_grid, third_cumulant)
+        }).collect();
+
+        // Backend
+        let third_plot_file = format!("{PLOTS_DIR}/{}/third_cumulant.svg", self.dataset);
+        let root = SVGBackend::new(&third_plot_file, (1080, 720)).into_drawing_area();
+        root.fill(&WHITE)?;
+
+        // Initialize chart
+        let dmin = *mins.iter().sorted_by(|a, b| a.partial_cmp(&b).expect("all distances should be finite")).next().unwrap();
+        let dmax = *maxs.iter().sorted_by(|a, b| a.partial_cmp(&b).expect("all distances should be finite")).next_back().unwrap();
+        let mut chart = ChartBuilder::on(&root)
+            .x_label_area_size(35)
+            .y_label_area_size(50)
+            .margin(5)
+            .caption(format!("Third Cumulant"), ("sans-serif", 50.0).into_font())
+            .build_cartesian_2d((dmin..dmax).log_scale(), (1e-3..10.0_f64).log_scale())?;
+        trace!("built cartesian grid");
+        chart
+            .configure_mesh()
+            // .disable_x_mesh()
+            // .disable_y_mesh()
+            .y_desc("Third Cumulant")
+            .y_label_formatter(&|x| format!("{:.2e}", x))
+            .draw()?;
+        trace!("configured mesh");
+
+        for (xy_pair, i) in xy_pairs.into_iter().zip(1..) {
+            chart
+            .draw_series(LineSeries::new(
+                xy_pair.0.into_iter().zip(xy_pair.1),
+                get_color(i as u8).stroke_width(3),
+            ))?
+            .label(format!("run {i}"))
+            .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], get_color(i as u8)));
+        }
+
+        chart
+            .configure_series_labels()
+            .background_style(&RGBColor(128, 128, 128))
+            .draw()?;
+
+        root.present().expect(format!("Unable to write {third_plot_file} to file").as_str());
+        println!("Plot saved to {}", third_plot_file);
     
         Ok(())
     }
@@ -369,9 +487,9 @@ impl KnnResult {
                     .next_back()
                     .unwrap();
 
-                // Get largest 4NN min
-                let four_nn = self.cdfs.get(&(i, 4)).unwrap();
-                let min = *four_nn
+                // Get largest KNN min
+                let k_nn = self.cdfs.get(&(i, K as u16)).unwrap();
+                let min = *k_nn
                     .iter()
                     .sorted_by(|a, b| a.partial_cmp(&b).unwrap())
                     .next()
@@ -484,22 +602,91 @@ fn cdf_4nn_from_prev(
     )
 }
 
+#[allow(unused)]
+/// This assumes that all the cdfs are interpolated to a common distance grid
+fn third_cumulant_approximated_from_first_k(
+    cdf_knns: Vec<InterpolatedCDF>,
+) -> InterpolatedCDF {
 
+    // Get num of points
+    let num: usize = cdf_knns
+        .get(0)
+        .unwrap()
+        .len();
 
+    // Note: for cumulants, k*Pk = 0 for k = 0 so we don't need it
+    let mut pks: Vec<InterpolatedCDF> = cdf_knns
+        .windows(2) 
+        .map(|x|{
 
+            // Banerjee & Abel 2020 Eq 8
+            // Pk = CDF_k - CDF_k+1
+            &x[0] - &x[1]
+
+        }).collect_vec();
+
+    // Third cumulant is given by
+    // 2 * sum(k Pk)^3 - 3 * sum(k Pk) * sum(k^2 Pk) + sum(k^3 Pk)
+    use std::ops::Add;
+    let result = {
+        let term_1 = 2.0 * pks.iter()
+            .zip(1..)
+            .fold(InterpolatedCDF::zeros(num), |acc, (pk, k)| acc + k as f64 * pk)
+            .mapv(|x| x.powi(3));
+        let term_2 = 3.0 * pks.iter()
+            .zip(1..)
+            .fold(InterpolatedCDF::zeros(num), |acc, (pk, k)| acc + k as f64 * pk)
+            * pks.iter()
+            .zip(1..)
+            .fold(InterpolatedCDF::zeros(num), |acc, (pk, k)| acc + (k as f64).powi(2) * pk);
+        let term_3 = pks.iter()
+            .zip(1..)
+            .fold(InterpolatedCDF::zeros(num), |acc, (pk, k)| acc + (k as f64).powi(3) * pk);
+
+        term_1 - term_2 + term_3
+    };
+
+    let _ = pks.pop();
+    let result_with_one_less_k = {
+        let term_1 = 2.0 * pks.iter()
+            .zip(1..)
+            .fold(InterpolatedCDF::zeros(num), |acc, (pk, k)| acc + k as f64 * pk)
+            .mapv(|x| x.powi(3));
+        let term_2 = 3.0 * pks.iter()
+            .zip(1..)
+            .fold(InterpolatedCDF::zeros(num), |acc, (pk, k)| acc + k as f64 * pk)
+            * pks.iter()
+            .zip(1..)
+            .fold(InterpolatedCDF::zeros(num), |acc, (pk, k)| acc + (k as f64).powi(2) * pk);
+        let term_3 = pks.iter()
+            .zip(1..)
+            .fold(InterpolatedCDF::zeros(num), |acc, (pk, k)| acc + (k as f64).powi(3) * pk);
+
+        term_1 - term_2 + term_3
+    };
+
+    info!(
+        "percent_diff of third cumulant with one less k: {:?}",
+        (&result - result_with_one_less_k) / &result
+    );
+
+    result
+}
 
 /// Assuming its i <= 15
 // fn get_color(i: u8) -> ShapeStyle {
 fn get_color(i: u8) -> RGBColor {
 
     // Zero-based index
-    let i: usize = i.checked_sub(1).unwrap().into();
-    assert!(i < 15, "This function was made for 15 categories/runs");
+    let mut i: usize = i.checked_sub(1).unwrap().into();
+    // Skip yellow due to visibility
+    if i >= 10 { i+= 1; }
+    assert!(i < 19, "This function was made for 19 categories/runs");
 
-    let color: Color = if i < 9 {
-        SET1[i]
+    let color: Color = if i < 12 {
+        PAIRED[i]
     } else {
-        SET2[i-9]
+        SET2[i-12]
     };
 
     // let color: Color = VIRIDIS.eval_rational(i as usize, total as usize);

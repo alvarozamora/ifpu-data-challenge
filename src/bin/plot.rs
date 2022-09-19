@@ -1,4 +1,4 @@
-use colorous::{Color, SET1, SET2, PAIRED};
+use colorous::{Color, SET2, PAIRED};
 use dashmap::DashMap;
 use itertools::Itertools;
 use ndarray_npy::NpzReader;
@@ -27,6 +27,9 @@ const SECOND_PLOT_PREFIX: &'static str = "all";
 
 /// Number of points to use for interpolation
 const INTERP_POINTS: usize = 200;
+
+/// Whether to use DD
+const USE_DD: bool = true;
 
 fn main() -> Result<(), Box<dyn Error>> {
 
@@ -61,7 +64,13 @@ impl KnnResult {
         trace!("getting knn outputs");
 
         // Load dataset
-        let mut npz = NpzReader::new(File::open(dataset.out())?)?;
+        let mut npz = NpzReader::new(
+            if USE_DD {
+                File::open(format!("{}_DD", dataset.out()))?
+            } else {
+                File::open(dataset.out())?
+            }
+        )?;
 
         // Initialize return value
         let cdfs = DashMap::new();
@@ -70,7 +79,7 @@ impl KnnResult {
             for k in 1..=K as u16 {
                 trace!("getting knn output ({run}, {k})");
                 cdfs.insert((run, k), npz
-                        .by_name(format!("run{run}_{k}").as_str())
+                        .by_name(format!("run{run}_{k}{}", if USE_DD { "_DD" } else { "" }).as_str())
                         .expect(format!("run{run}_{k} should exist").as_str()));
             }
         }
@@ -122,8 +131,8 @@ impl KnnResult {
             let dmin = distances.iter().sorted_by(|a, b| a.partial_cmp(&b).unwrap()).next().unwrap()*0.95;
             let dmax = distances.iter().sorted_by(|a, b| a.partial_cmp(&b).unwrap()).next_back().unwrap()*1.15;
             let mut chart = ChartBuilder::on(&root)
-                .x_label_area_size(35)
-                .y_label_area_size(50)
+                .x_label_area_size(40)
+                .y_label_area_size(100)
                 .margin(5)
                 .caption(format!("Difference from {k}NN mean"), ("sans-serif", 50.0).into_font())
                 .build_cartesian_2d((dmin..dmax).log_scale(), -1.5e-3..1.5e-3_f64)?;
@@ -196,6 +205,8 @@ impl KnnResult {
 
         // plot 2 (one per run, all k shown)
         trace!("starting second plot");
+        let mut diff_3 = vec![];
+        let mut diff_4 = vec![];
         for run in 1..=15 {
 
             trace!("working on run {run} for second plot");
@@ -208,8 +219,8 @@ impl KnnResult {
     
             // Initialize chart
             let mut chart = ChartBuilder::on(&root)
-                .x_label_area_size(35)
-                .y_label_area_size(40)
+                .x_label_area_size(40)
+                .y_label_area_size(100)
                 .margin(5)
                 .caption("Gaussian Expectations", ("sans-serif", 50.0).into_font())
                 .build_cartesian_2d((1.0f64..5e2f64).log_scale(), (self.quantiles[0]..1.0).log_scale())?;
@@ -246,6 +257,14 @@ impl KnnResult {
                 measured_2nn.to_vec(),
                 self.quantiles.to_vec(), // this clones, maybe faster than .clone().into_raw_vec()
             )?;
+            let interpolator_3nn = Interp1d::new_unsorted(
+                measured_3nn.to_vec(),
+                self.quantiles.to_vec(), // this clones, maybe faster than .clone().into_raw_vec()
+            )?;
+            let interpolator_4nn = Interp1d::new_unsorted(
+                measured_4nn.to_vec(),
+                self.quantiles.to_vec(), // this clones, maybe faster than .clone().into_raw_vec()
+            )?;
             let rmin = measured_4nn
                 .iter()
                 .sorted_by(|a,b| a.partial_cmp(&b).unwrap())
@@ -274,6 +293,20 @@ impl KnnResult {
                     interpolator_2nn.interpolate_checked(r).expect("should be in domain")
                 })
                 .collect();
+            let interp_3nn: InterpolatedCDF = interp_grid
+                .iter()
+                .cloned()
+                .map(|r|{
+                    interpolator_3nn.interpolate_checked(r).expect("should be in domain")
+                })
+                .collect();
+            let interp_4nn: InterpolatedCDF = interp_grid
+                .iter()
+                .cloned()
+                .map(|r| {
+                    interpolator_4nn.interpolate_checked(r).expect("should be in domain")
+                })
+                .collect();
             let gaussian_3nn = cdf_3nn_from_prev(
                 &interp_1nn,
                 &interp_2nn,
@@ -283,6 +316,8 @@ impl KnnResult {
                 &interp_2nn,
                 &gaussian_3nn
             );
+            diff_3.push((interp_grid.clone(), &interp_3nn - &gaussian_3nn));
+            diff_4.push((interp_grid.clone(), &interp_4nn - &gaussian_4nn));
 
             chart
                 .draw_series(LineSeries::new(
@@ -373,6 +408,76 @@ impl KnnResult {
         }
 
         trace!("starting third plot");
+        let diffs = [(3, diff_3), (4, diff_4)];
+        for (k, interp_grid_and_diff) in diffs {
+
+            // Backend
+            let third_plot_file = format!("{PLOTS_DIR}/{}/GRF_diff_{k}.svg", self.dataset);
+            let root = SVGBackend::new(&third_plot_file, (1920, 1080)).into_drawing_area();
+            root.fill(&WHITE)?;
+
+            // Initialize chart
+            let (mut ymin, mut ymax) = interp_grid_and_diff
+                .iter()
+                .fold((std::f64::MAX, std::f64::MIN), |mut acc, (_, diff)| {
+                    let mut sorted_iter = diff
+                        .iter()
+                        .sorted_by(|a, b| a.partial_cmp(&b).expect("all values should be finite"));
+                    let ymax: f64 = *sorted_iter.next_back().unwrap();
+                    let ymin: f64 = *sorted_iter.next().unwrap();
+        
+                    if acc.0 > ymin { acc.0 = ymin }
+                    if acc.1 < ymax { acc.1 = ymax }
+                    acc
+                });
+            if ymin < 0.0 { ymin *= 1.05 } else { ymin *= 0.95 };
+            if ymax < 0.0 { ymax *= 0.95 } else { ymax *= 1.05 };
+            let mut chart = ChartBuilder::on(&root)
+                .x_label_area_size(40)
+                .y_label_area_size(100)
+                .margin(5)
+                .caption("Gaussian Expectation Diff", ("sans-serif", 50.0).into_font())
+                .build_cartesian_2d((2e1f64..3e2f64).log_scale(), ymin..ymax)?;
+            chart
+                .configure_mesh()
+                // .disable_x_mesh()
+                // .disable_y_mesh()
+                .y_desc("Measured-Expected")
+                .y_label_formatter(&|x| format!("{:.2e}", x))
+                .draw()?;
+
+            
+            for run in 1..=15 {
+
+                // Zero-based index
+                let run_idx = run - 1;
+
+                let (interp_grid, diff) = interp_grid_and_diff.get(run_idx).expect("should exist");
+
+                chart
+                    .draw_series(LineSeries::new(
+                        interp_grid
+                            .into_iter()
+                            .zip(diff)
+                            .map(|(x, y)| {
+                                (*x, *y)
+                            }),
+                        get_color(run as u8 + 2).stroke_width(3),
+                    ))?
+                    .label(format!("run {run}"))
+                    .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], get_color(run as u8 + 2)));
+            }
+            chart
+                .configure_series_labels()
+                .background_style(&RGBColor(128, 128, 128))
+                .draw()?;
+    
+            // To avoid the IO failure being ignored silently, we manually call the present function
+            root.present().expect(format!("Unable to write {third_plot_file} to file").as_str());
+            println!("Plot saved to {}", third_plot_file);
+        }
+
+        trace!("starting fourth plot");
         let mut mins = vec![];
         let mut maxs = vec![];
         let xy_pairs: Vec<(InterpolatedCDF, InterpolatedCDF)> = (1..=15)
@@ -430,16 +535,16 @@ impl KnnResult {
         }).collect();
 
         // Backend
-        let third_plot_file = format!("{PLOTS_DIR}/{}/third_cumulant.svg", self.dataset);
-        let root = SVGBackend::new(&third_plot_file, (1080, 720)).into_drawing_area();
+        let fourth_plot_file = format!("{PLOTS_DIR}/{}/third_cumulant.svg", self.dataset);
+        let root = SVGBackend::new(&fourth_plot_file, (1080, 720)).into_drawing_area();
         root.fill(&WHITE)?;
 
         // Initialize chart
         let dmin = *mins.iter().sorted_by(|a, b| a.partial_cmp(&b).expect("all distances should be finite")).next().unwrap();
         let dmax = *maxs.iter().sorted_by(|a, b| a.partial_cmp(&b).expect("all distances should be finite")).next_back().unwrap();
         let mut chart = ChartBuilder::on(&root)
-            .x_label_area_size(35)
-            .y_label_area_size(50)
+            .x_label_area_size(40)
+            .y_label_area_size(100)
             .margin(5)
             .caption(format!("Third Cumulant"), ("sans-serif", 50.0).into_font())
             .build_cartesian_2d((dmin..dmax).log_scale(), (1e-3..10.0_f64).log_scale())?;
@@ -468,8 +573,8 @@ impl KnnResult {
             .background_style(&RGBColor(128, 128, 128))
             .draw()?;
 
-        root.present().expect(format!("Unable to write {third_plot_file} to file").as_str());
-        println!("Plot saved to {}", third_plot_file);
+        root.present().expect(format!("Unable to write {fourth_plot_file} to file").as_str());
+        println!("Plot saved to {}", fourth_plot_file);
     
         Ok(())
     }
